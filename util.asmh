@@ -1,0 +1,360 @@
+; util.asmh
+
+%ifndef util
+    %define util
+    [warning +all]
+
+    bits 32
+    %define base 0x07000000
+    %define code (base+0x78)
+
+   %ifndef _custom_source
+        extern fail
+        extern strlen
+        extern print
+        extern exit
+        extern getpw
+        extern resetterm
+        extern sys_write
+        extern sys_write_n
+        extern lf
+        extern read
+        extern write
+        extern open
+        extern memfd_create
+        extern execveat
+    %else
+        global fail
+        global strlen
+        global print
+        global exit
+        global getpw
+        global resetterm
+        global sys_write
+        global sys_write_n
+        global lf
+        global read
+        global write
+        global open
+        global memfd_create
+        global execveat
+    %endif
+
+;   print :: String -> Int
+    %macro print 0
+            call sys_write
+    %endmacro
+;   println :: String -> Int
+    %macro println 0
+            print
+            mov eax,lf
+            push eax
+            print
+    %endmacro
+;   printonlyln :: Int
+    %macro printonlyln 0
+        mov eax,lf
+        push eax
+        print
+    %endmacro
+;   printn :: String -> Int -> Int
+    %macro printn 2
+        mov ebx,%2
+        push ebx
+        mov ebx,%1
+        push ebx
+        call sys_write_n
+    %endmacro
+
+;   head :: ()
+    %macro head 0
+            mov edi,esi
+            pop esi
+    %endmacro
+;   head :: Reg -> Reg -> ()
+    %macro head 2
+            mov %2,%1
+            pop %1
+    %endmacro
+
+;   tail :: ()
+    %macro tail 0
+            push esi
+            mov esi,edi
+    %endmacro
+;   tail :: Reg -> Reg -> ()
+    %macro tail 2
+            push %1
+            mov %1,%2
+    %endmacro
+
+    %define tcgets  0x5401
+    %define tcsets  0x5402
+    %define echo    0x08
+    %define icanon  0x02
+
+;   echoon :: Pointer t => Struct Termios t -> Int
+    %macro echoon 1
+        secho %1,0x01
+    %endmacro
+;   echooff :: Pointer t => Struct Termios t -> Int
+    %macro echooff 1
+        secho %1,0x00
+    %endmacro
+;   secho :: Pointer t => Struct Termios t -> Bool -> Int
+    %macro secho 2
+        mov eax,%1
+        push eax
+        mov eax,tcgets
+        push eax
+        xor eax,eax
+        push eax
+        call sys_ioctl
+
+        mov eax,(%1+termios.c_lflag)
+        mov ecx,(%1+termios.c_cc+vtime)
+        mov edx,(%1+termios.c_cc+vmin)
+        mov ebx,[eax]
+
+        mov eax,echo
+        or eax,icanon
+    %if ! %2
+        not eax
+        and eax,ebx
+
+        xor ebx,ebx
+        mov byte bl,[ecx]
+        mov byte [gs4],bl
+        xor bl,bl
+        mov byte [ecx],bl
+
+        xor ebx,ebx
+        mov byte bl,[edx]
+        mov byte [gs5],bl
+        ; xor bl,bl
+        mov ebx,0x01
+        mov byte [edx],bl
+
+
+    %else
+        or eax,ebx
+
+        xor ebx,ebx
+        mov byte bl,[gs4]
+        mov byte [ecx],bl
+
+        xor ebx,ebx
+        mov byte bl,[gs5]
+        mov byte [edx],bl
+    %endif
+        
+        mov ebx,(%1+termios.c_lflag)
+        mov dword [ebx],eax
+        mov eax,%1
+        push dword eax
+        mov eax,tcsets
+        push eax
+        xor eax,eax
+        push eax
+        call sys_ioctl
+    %endmacro
+
+;   (Bool==True) = Only one ansi arg
+;   ansihelper :: Bool -> Int -> Int -> Int
+    %macro ansihelper 3
+        %if %1
+            mov eax,ansicode.arg101
+        %else
+            mov eax,ansicode.arg201
+        %endif
+
+        mov ebx,(0x30+%2)
+        mov byte [eax],bl
+        inc eax
+        mov ebx,(0x30+%3)
+        mov byte [eax],bl
+    %endmacro
+
+;   ansi :: Int
+    %macro ansi 0
+        mov eax,ansicode.arg0
+        push eax
+        print
+    %endmacro
+;   ansi :: Int -> Int -> Int
+    %macro ansi 2
+        ansihelper 1,%1,%2
+        mov eax,ansicode.arg1
+        push eax
+        print
+    %endmacro
+;   ansi :: Int -> Int -> Int -> Int -> Int
+    %macro ansi 4
+        ansihelper 0,%1,%2
+        mov eax,ansicode.arg202
+        mov ebx,(0x30+%3)
+        mov byte [eax],bl
+        inc eax
+        mov ebx,(0x30+%4)
+        mov byte [eax],bl
+
+        mov eax,ansicode.arg2
+        push eax
+        print
+    %endmacro
+
+;   signal :: Sighandler -> Sighandler
+    %macro signal 1
+        signal 0x02,%1 ; SIGINT
+    %endmacro
+;   signal :: Int -> Sighandler -> Sighandler
+    %macro signal 2
+        mov eax,0x30
+        mov ebx,%1
+        mov ecx,%2
+        int 0x80
+    %endmacro
+
+;   rightrotate :: Register -> Word32
+    %macro rightrotate 1
+        rightrotate %1,1
+    %endmacro
+;   rightrotate :: Register -> Int -> Word32
+    %macro rightrotate 2
+            mov ecx,%2
+
+        %%loop:
+            mov ebx,0x01
+            mov edx,%1
+            and edx,ebx
+            shl edx,0x1f
+            mov ebx,%1
+            shr ebx,0x01
+            or ebx,edx
+            mov %1,ebx
+
+            dec ecx
+            jz %%done
+            nop
+            jmp %%loop
+
+        %%done:
+            ; return %1
+    %endmacro
+;   leftrotate :: Register -> Word32
+    %macro leftrotate 1
+        leftrotate %1,1
+    %endmacro
+;   leftrotate :: Register -> Int -> Word32
+    %macro leftrotate 2
+            mov ecx,%2
+
+        %%loop:
+            mov ebx,0x80000000
+            mov edx,%1
+            and edx,ebx
+            shr edx,0x1f
+            mov ebx,%1
+            shl ebx,0x01
+            or bl,dl
+            mov %1,ebx
+
+            dec ecx
+            jz %%done
+            nop
+            jmp %%loop
+
+        %%done:
+            ; return %1
+    %endmacro
+
+;   mod :: Int -> Int -> Int
+    %macro mod 2
+        push dword [gs0]
+        pushad
+        xor edx,edx
+        mov eax,%2
+        mov ebx,%1
+        div ebx
+        mov [gs0],eax
+        popad
+        mov %1,[gs0]
+        pop dword [gs0]
+    %endmacro
+
+;   pushgs :: Offset o => o -> Int
+    %macro pushgs 1
+        ; mov eax,gs:%1
+        ; push eax
+    %endmacro
+;   popgs :: (Register r, Offset o) => r -> o -> Int
+    %macro popgs 2
+        ; pop %1
+        ; mov gs:%2,%1
+    %endmacro
+;   pushgsad :: ()
+    %macro pushgsad 0
+        pushgs 0x08
+        pushgs 0x0c
+        pushgs 0x10
+        pushgs 0x14
+        pushgs 0x1a
+        pushgs 0x2a
+    %endmacro
+;   popgsad :: Register r => r -> Int
+    %macro popgsad 1
+        popgs %1,0x2a
+        popgs %1,0x1a
+        popgs %1,0x14
+        popgs %1,0x10
+        popgs %1,0x0c
+        popgs %1,0x08
+    %endmacro
+
+       
+
+
+
+
+
+
+
+    %define vtime   0x05
+    %define vmin    0x06
+    %define nccs    0x13
+    struc termios
+        .c_iflag    resd 0x01
+        .c_oflag    resd 0x01
+        .c_cflag    resd 0x01
+        .c_lflag    resd 0x01
+        .c_line     resb 0x01
+        .c_cc       resb nccs
+    endstruc
+
+    struc pwstate
+        .cur        resb 0x20
+        .old        resb 0x20
+        .password   resb 0x20
+        .buf        resb 0x02
+        .length     resb 0x01
+    endstruc
+
+    %define o_rdonly    0x00
+    %define o_wronly    0x01
+    %define o_creat     0x40
+    %define o_trunc     0x0200
+    %define mfd_cloexec     0x01
+    %define at_empty_path   0x1000
+
+    %macro gsvars 0
+        gs0     dd 0x01
+        gs4:    dw 0x01
+            gs5 db 0x01
+            gs6 db 0x01
+        gs8     dd 0x01
+        gsc     dd 0x01
+        gs10    dd 0x01
+        gs14    dd 0x01
+        gs1c    dd 0x01
+    %endmacro
+%endif
