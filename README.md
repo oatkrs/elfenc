@@ -119,7 +119,7 @@ You might have to tweak the Makefile to correct the directory, simply `ldd /bin/
 
 ```sudo make install```
 
-```cd ..``
+```cd ..```
 
 Also, there are several other options like clean, all, and other file specifc ones, when recompiling it's always recommended to do `make clean`
 
