@@ -71,6 +71,7 @@ https://cdimage.debian.org/debian-cd/current/i386/iso-cd/debian-12.10.0-i386-net
 ```sudo apt-get install libgmp-dev libmpfr-dev libmpc-dev libisl-dev libzstd-dev -y```
 
 > Note: Configuration (step 6) might take anywhere from a few minutes to few hours depending on the resources you've allocated to the VM, if it takes too long, you may download my preconfigured files ready for make, `unzip` and `cd` into folder and skip to Step 7.
+> https://www.dropbox.com/scl/fi/o5c2buyp1vykjwtrxmaqz/gcc-14.2.0-configured-i368.zip?rlkey=cy9xv52ivp35802uibu41ey4w&st=zv89rc92&dl=0
 
 3. Download latest/compatible GNU GCC
 
