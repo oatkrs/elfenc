@@ -1,6 +1,10 @@
 # ELFEnc
 ### brainstorming for a better name in progress
 
+**Resume Description:** A security tool that encrypts ELF binary executables using password protection, custom cryptographic algorithms (modified RC4 stream cipher and key derivation), and in-memory execution to create uncrackable static executables for Linux systems.
+
+---
+
 When you do not want to share your source but want people to be able to use your program/logic, you simply obfuscate and compile your program, but when you dont want EVERYONE to be able to do that, you use ELFEnc, the only way to generate uncrackable static executables.
 
 ELFEnc aims to secure any and every elf binary executable in existence to an uncrackable (as of today's technology) state.
